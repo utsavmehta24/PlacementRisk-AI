@@ -150,20 +150,89 @@ This spins up 6 services: PostgreSQL, Redis, Backend, Frontend, MLflow, and Cele
 
 > Students `student0001` through `student1500` are all available with password `demo123`.
 
-### 5. Seed Data & Train Models (Optional)
+### 5. Train ML Models & Activate Real Predictions
+
+> ⚠️ The app runs in **fallback/heuristic mode** until you complete this sequence. Follow all 5 steps in order to activate real XGBoost/LightGBM predictions.
+
+#### Step 1 — Ensure the full stack is running
 
 ```bash
-# Generate 50K synthetic student profiles
-docker compose exec backend python -m app.data.synthetic
-
-# Train XGBoost + LightGBM models
-docker compose exec backend python -m app.ml.train
-
-# Backfill risk scores for all students (via Admin dashboard → Operations tab)
-# Or via API:
-curl -X POST http://localhost:8000/api/admin/backfill-risk-scores \
-  -H "Authorization: Bearer <admin_token>"
+docker compose up -d
 ```
+
+MLflow must be reachable at `http://mlflow:5000` before training starts. Wait ~60 seconds after startup.
+
+#### Step 2 — Generate synthetic data (first time only)
+
+```bash
+docker compose exec backend python -m app.data.synthetic
+```
+
+This creates 4 CSV files in `data/synthetic/`:
+- `students.csv` — 50,000 student profiles
+- `institutes.csv` — 500 institutes with placement history
+- `placement_outcomes.csv` — historical placement records
+- `job_market_signals.csv` — sector-wise hiring signals
+
+These are mounted into the container via `./data:/data` in `docker-compose.yml`.
+
+#### Step 3 — Run model training (10–20 min on CPU)
+
+```bash
+docker exec placementrisk-backend python -m app.ml.train
+```
+
+This trains **6 models** and logs them to MLflow:
+- 3 × XGBoost placement classifiers (3mo / 6mo / 12mo windows, 5-fold calibration)
+- 3 × LightGBM salary quantile regressors (P10 / P50 / P90)
+
+Artifacts saved to `/models/v_TIMESTAMP/` with a `/models/latest` symlink:
+```
+placement_3mo.pkl   placement_6mo.pkl   placement_12mo.pkl
+salary_p10.pkl      salary_p50.pkl      salary_p90.pkl
+encoders.pkl        feature_names.json  metadata.json
+```
+
+#### Step 4 — Restart backend to load trained models
+
+The predictor is a singleton loaded once at startup. Restart to pick up the new models:
+
+```bash
+docker restart placementrisk-backend
+```
+
+After restart, the first scoring request loads real models from `/models/latest` instead of the heuristic fallback.
+
+#### Step 5 — Backfill scores + generate alerts
+
+Training creates model files — it does **not** score existing students. Do both from the **Admin → Operations** tab, or via API:
+
+```bash
+# Get admin token first
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@placementrisk.ai","password":"demo123"}' \
+  | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+# Backfill risk scores for all students
+curl -X POST http://localhost:8000/api/admin/backfill-risk-scores \
+  -H "Authorization: Bearer $TOKEN"
+
+# Generate early warning alerts
+curl -X POST http://localhost:8000/api/admin/generate-alerts \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+#### ✅ After all 5 steps
+
+| Feature | Before Training | After Training |
+|---------|----------------|----------------|
+| Risk scoring | Heuristic fallback | Real XGBoost/LightGBM |
+| SHAP explanations | Rule-based text | Real feature attributions |
+| Portfolio heatmap | Empty | Fully populated |
+| Alerts page | Empty | Real risk-based alerts |
+| MLflow panel | No runs | 4 experiment runs with metrics |
+| Student portal "Run Analysis" | Fallback score | Real model prediction |
 
 ---
 
@@ -433,6 +502,7 @@ MODEL_SEED=42
 - Docker · Docker Compose · Nginx
 
 ---
+
 
 ## 📄 License
 
