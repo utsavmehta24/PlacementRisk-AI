@@ -193,7 +193,13 @@ def save_models(placement_models, salary_models, encoders, feature_names):
     # Create symlink to latest
     latest_link = model_dir / "latest"
     if latest_link.exists():
-        latest_link.unlink()
+        if latest_link.is_symlink():
+            latest_link.unlink()
+        elif latest_link.is_dir():
+            import shutil
+            shutil.rmtree(latest_link)
+        else:
+            latest_link.unlink()
     latest_link.symlink_to(version_dir.name)
     
     print(f"✓ Models saved successfully!")
