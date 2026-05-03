@@ -1,4 +1,6 @@
 """Database connection and session management"""
+import os
+import uuid
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -27,7 +29,69 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _seed_institutes_from_csv()
     _seed_demo_users()
+
+
+def _seed_institutes_from_csv():
+    """Load institutes from CSV into the database if the table is empty."""
+    import csv
+    from app.models.schemas import Institute, NIRFRankBand, TrendType
+
+    CSV_PATHS = [
+        "/data/synthetic/institutes.csv",
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "synthetic", "institutes.csv"),
+    ]
+
+    csv_path = None
+    for p in CSV_PATHS:
+        if os.path.exists(p):
+            csv_path = p
+            break
+
+    if not csv_path:
+        print("institutes.csv not found, skipping institute seeding")
+        return
+
+    db = SessionLocal()
+    try:
+        count = db.query(Institute).count()
+        if count > 0:
+            print(f"Institutes already seeded ({count} records), skipping")
+            return
+
+        print(f"Seeding institutes from {csv_path}...")
+        loaded = 0
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    institute = Institute(
+                        id=uuid.UUID(row["id"]),
+                        institute_name=row["institute_name"],
+                        nirf_rank_band=NIRFRankBand(row["nirf_rank_band"]),
+                        city=row["city"],
+                        state=row["state"],
+                        region=row["region"],
+                        placement_rate_3mo=float(row["placement_rate_3mo"]),
+                        placement_rate_6mo=float(row["placement_rate_6mo"]),
+                        placement_rate_12mo=float(row["placement_rate_12mo"]),
+                        median_salary=int(float(row["median_salary"])),
+                        placement_cell_activity_index=float(row["placement_cell_activity_index"]),
+                        recruiter_participation_trend=TrendType(row["recruiter_participation_trend"]),
+                    )
+                    db.add(institute)
+                    loaded += 1
+                except Exception as row_err:
+                    print(f"Skipping row {row.get('id', '?')}: {row_err}")
+
+        db.commit()
+        print(f"✓ Seeded {loaded} institutes from CSV")
+    except Exception as e:
+        db.rollback()
+        print(f"Could not seed institutes: {e}")
+    finally:
+        db.close()
 
 
 def _seed_demo_users():
