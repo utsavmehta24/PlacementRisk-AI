@@ -1,6 +1,4 @@
-// placeholder
-
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { portfolioAPI, caseAPI } from '../api/client';
 import PortfolioHeatmap from '../components/PortfolioHeatmap';

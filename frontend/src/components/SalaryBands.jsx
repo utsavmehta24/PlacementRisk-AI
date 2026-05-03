@@ -1,5 +1,3 @@
-import React from 'react';
-
 function SalaryBands({ p10, p50, p90, emi }) {
   const maxSalary = Math.max(p90, 1);
   const emiThreshold = emi * 12 * 3;

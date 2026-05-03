@@ -59,34 +59,34 @@ def refresh_features(self):
 
 @celery_app.task(name="app.tasks.predict_risk_async")
 def predict_risk_async(student_data: dict):
-    """Async risk prediction task"""
+    """Async risk prediction task — triggers full scoring pipeline for a single student"""
     try:
-        from app.ml.predict import predict_placement_risk
-        
-        logger.info(f"Processing async risk prediction for student")
-        result = predict_placement_risk(student_data)
-        
-        return result
+        from app.workflows.backfill_scores import backfill_missing_risk_scores
+        from app.database import SessionLocal
+        db = SessionLocal()
+        try:
+            result = backfill_missing_risk_scores(db, batch_size=1)
+            return {"status": "success", "scored": result}
+        finally:
+            db.close()
     except Exception as e:
         logger.error(f"Error in async prediction: {str(e)}")
         raise
 
 
 @celery_app.task(name="app.tasks.batch_predict")
-def batch_predict(student_data_list: list):
-    """Batch prediction task for multiple students"""
+def batch_predict(student_ids: list):
+    """Batch prediction task — re-scores a list of students by ID"""
     try:
-        from app.ml.predict import predict_placement_risk
-        
-        logger.info(f"Processing batch prediction for {len(student_data_list)} students")
-        results = []
-        
-        for student_data in student_data_list:
-            result = predict_placement_risk(student_data)
-            results.append(result)
-        
-        logger.info(f"Batch prediction completed for {len(results)} students")
-        return results
+        from app.workflows.backfill_scores import backfill_missing_risk_scores
+        from app.database import SessionLocal
+        db = SessionLocal()
+        try:
+            result = backfill_missing_risk_scores(db)
+            logger.info(f"Batch prediction completed for {result} students")
+            return {"status": "success", "scored": result}
+        finally:
+            db.close()
     except Exception as e:
         logger.error(f"Error in batch prediction: {str(e)}")
         raise

@@ -1,5 +1,3 @@
-import React from 'react';
-
 function PortfolioHeatmap({ data }) {
   if (!data || !data.cells || data.cells.length === 0) {
     return (

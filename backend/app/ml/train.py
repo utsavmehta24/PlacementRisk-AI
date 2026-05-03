@@ -206,9 +206,15 @@ def main():
     print("PlacementRisk AI - Model Training")
     print("=" * 60)
     
-    # Set MLflow tracking URI
+    # Set MLflow tracking URI — fall back to local file store if server unreachable
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-    mlflow.set_experiment("placementrisk_training")
+    try:
+        mlflow.set_experiment("placementrisk_training")
+        print(f"✓ MLflow connected: {settings.mlflow_tracking_uri}")
+    except Exception as e:
+        print(f"⚠ MLflow server unreachable ({e.__class__.__name__}). Falling back to local ./mlruns")
+        mlflow.set_tracking_uri("./mlruns")
+        mlflow.set_experiment("placementrisk_training")
     
     # Load data
     print("\nLoading data...")

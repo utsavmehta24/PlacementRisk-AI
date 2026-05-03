@@ -1,5 +1,3 @@
-import React from 'react';
-
 function RiskBadge({ level, score, large = false }) {
   const getColorClass = () => {
     switch (level) {

@@ -1,5 +1,5 @@
 """Main FastAPI application for PlacementRisk AI"""
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 

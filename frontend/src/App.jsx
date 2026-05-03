@@ -1,5 +1,4 @@
-﻿import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+﻿import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import StudentView from './pages/StudentView';
 import Alerts from './pages/Alerts';
@@ -34,7 +33,6 @@ function App() {
           <Route path="/student-portal" element={<PrivateRoute roles={['student']}><StudentPortal /></PrivateRoute>} />
           <Route path="/student/:id" element={<PrivateRoute roles={['admin', 'risk_head', 'loan_officer']}><StudentView /></PrivateRoute>} />
           <Route path="/alerts" element={<PrivateRoute roles={['admin', 'risk_head', 'loan_officer']}><Alerts /></PrivateRoute>} />
-          <Route path="/legacy-dashboard" element={<PrivateRoute roles={['admin', 'risk_head', 'loan_officer']}><Dashboard /></PrivateRoute>} />
         </Routes>
       </div>
     </Router>
