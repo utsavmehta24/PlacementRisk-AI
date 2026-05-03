@@ -55,7 +55,7 @@ function Alerts() {
             <h1 className="text-2xl font-bold">Early Warning Alerts</h1>
             <p className="text-sm text-slate-400">Event-driven deteriorating risk signals</p>
           </div>
-          <button onClick={() => navigate('/')} className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-500">Back to Dashboard</button>
+          <button onClick={() => navigate(-1)} className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-500">← Back</button>
         </div>
       </header>
 

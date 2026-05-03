@@ -21,13 +21,17 @@ function LandingPage() {
         </div>
         <div className="bg-slate-900/70 border border-slate-700 rounded-2xl p-6">
           <h3 className="text-xl font-semibold">Role Access</h3>
-          <ul className="mt-4 space-y-3 text-slate-200">
-            <li>Admin Sign In: institute portfolio, risk monitoring, operations control.</li>
-            <li>Officer Sign In: student cases, approvals, and communication workflows.</li>
-            <li>Student Sign In: personal risk view, active case updates, and inbox support.</li>
+          <ul className="mt-4 space-y-3 text-slate-200 text-sm">
+            <li className="flex gap-2"><span className="text-amber-400 font-bold">Admin</span> — institute portfolio, risk monitoring, operations control.</li>
+            <li className="flex gap-2"><span className="text-blue-400 font-bold">Officer</span> — student cases, approvals, and communication workflows.</li>
+            <li className="flex gap-2"><span className="text-emerald-400 font-bold">Student</span> — personal risk view, active case updates, and inbox support.</li>
           </ul>
-          <p className="mt-4 text-xs text-slate-400">
-            Student account creation is managed by institution/admin onboarding. If you are a student, sign in with credentials shared with you.
+          <div className="mt-5 flex flex-col gap-2">
+            <Link to="/login" className="block text-center px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium">Sign In</Link>
+            <Link to="/student-signup" className="block text-center px-4 py-2 rounded-lg border border-slate-600 hover:border-blue-500 text-slate-200 text-sm">New Student? Create Account</Link>
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Demo: admin@placementrisk.ai / riskhead@placementrisk.ai / officer@placementrisk.ai — all use password <span className="text-amber-300">demo123</span>
           </p>
         </div>
       </main>

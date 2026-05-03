@@ -86,8 +86,11 @@ function Login() {
               Officer demo: officer@placementrisk.ai / demo123
             </button>
           </div>
-          <div className="mt-3 text-xs text-amber-300 bg-amber-950/40 border border-amber-900 rounded px-3 py-2">
-            Student Sign In: use your assigned email/password, or your student ID with the same password, to access the Student Portal.
+          <button type="button" onClick={() => applyDemo('student00001@placementrisk.ai')} className="text-left px-3 py-2 rounded border border-slate-700 hover:border-blue-500 hover:bg-slate-800">
+              Student demo: student00001@placementrisk.ai / demo123
+            </button>
+          <div className="mt-3 text-xs text-slate-400 bg-slate-900 border border-slate-700 rounded px-3 py-2">
+            Seeded students: <span className="text-blue-300">student00001@placementrisk.ai</span> through <span className="text-blue-300">student01500@placementrisk.ai</span> — all use password <span className="text-amber-300">demo123</span>
           </div>
           <div className="mt-3 text-sm text-slate-300">
             New student? <Link to="/student-signup" className="text-blue-300 hover:text-blue-200">Create student account</Link>

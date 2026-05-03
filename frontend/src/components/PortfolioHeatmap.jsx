@@ -1,6 +1,13 @@
 import React from 'react';
 
 function PortfolioHeatmap({ data }) {
+  if (!data || !data.cells || data.cells.length === 0) {
+    return (
+      <div className="text-center py-10 text-slate-400 text-sm border border-slate-700 rounded-xl">
+        No scored students yet. Click <strong>Backfill Risk Scores</strong> above to generate scores.
+      </div>
+    );
+  }
   const getRiskLabel = (avgScore) => {
     if (avgScore < 0.4) return 'HIGH';
     if (avgScore < 0.65) return 'MEDIUM';
@@ -57,7 +64,7 @@ function PortfolioHeatmap({ data }) {
       </div>
 
       <p className="text-xs text-slate-300">
-        Total students: {data.total_students.toLocaleString()} | High risk percentage: {data.high_risk_percentage.toFixed(1)}%
+        Total students: {(data.total_students || 0).toLocaleString()} | High risk percentage: {(data.high_risk_percentage || 0).toFixed(1)}%
       </p>
     </div>
   );

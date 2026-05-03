@@ -53,7 +53,7 @@ function StudentView() {
             <h1 className="text-2xl font-bold">Student Risk Profile</h1>
             <p className="text-sm text-slate-300">{student.student_name}</p>
           </div>
-          <button onClick={() => navigate('/')} className="px-4 py-2 bg-blue-500 rounded-md hover:bg-blue-400">Back to Dashboard</button>
+          <button onClick={() => navigate(-1)} className="px-4 py-2 bg-blue-500 rounded-md hover:bg-blue-400">← Back</button>
         </div>
       </header>
 

@@ -249,6 +249,23 @@ async def my_profile(db: Session = Depends(get_db), current_user: User = Depends
     return payload
 
 
+def _filter_unique_institutes(institutes):
+    seen = set()
+    unique = []
+    for inst in institutes:
+        key = (
+            inst.institute_name.strip().lower(),
+            inst.city.strip().lower(),
+            inst.state.strip().lower(),
+            (inst.region or "").strip().lower(),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(inst)
+    return unique
+
+
 @router.get("/institutes")
 async def list_institutes(
     search: Optional[str] = Query(None),
@@ -260,6 +277,7 @@ async def list_institutes(
     if search:
         query = query.filter(Institute.institute_name.ilike(f"%{search}%"))
     institutes = query.order_by(Institute.institute_name.asc()).limit(limit).all()
+    institutes = _filter_unique_institutes(institutes)
     return [
         {
             "id": str(i.id),

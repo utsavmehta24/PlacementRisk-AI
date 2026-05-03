@@ -17,21 +17,49 @@ function AdminDashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const [s, h, m, i] = await Promise.all([
-        portfolioAPI.getStats(),
-        portfolioAPI.getHeatmap(),
-        adminAPI.getMonitoring(),
-        adminAPI.getInstitutes(),
-      ]);
-      setStats(s.data);
-      setHeatmapData(h.data);
-      setMonitoring(m.data);
-      setInstitutes(i.data);
+      try {
+        const [s, m, i] = await Promise.all([
+          portfolioAPI.getStats(),
+          adminAPI.getMonitoring(),
+          adminAPI.getInstitutes(),
+        ]);
+        setStats(s.data);
+        setMonitoring(m.data);
+        setInstitutes(i.data);
+        // Load heatmap separately — it may be empty if no scores yet
+        try {
+          const h = await portfolioAPI.getHeatmap();
+          setHeatmapData(h.data);
+        } catch (_) {
+          setHeatmapData({ cells: [], total_students: 0, high_risk_percentage: 0 });
+        }
+      } catch (e) {
+        console.error(e);
+      }
     };
-    load().catch((e) => console.error(e));
+    load();
   }, []);
 
-  const filtered = useMemo(() => institutes.filter((i) => i.name.toLowerCase().includes(query.toLowerCase())), [query, institutes]);
+  const uniqueInstitutes = useMemo(() => {
+    const seen = new Set();
+    return institutes.filter((inst) => {
+      const key = [inst.name.trim().toLowerCase(), inst.city.trim().toLowerCase(), inst.state.trim().toLowerCase(), (inst.region || '').trim().toLowerCase()].join('|');
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }, [institutes]);
+
+  const filtered = useMemo(() => {
+    const queryText = query.trim().toLowerCase();
+    return uniqueInstitutes.filter((inst) =>
+      inst.name.toLowerCase().includes(queryText) ||
+      inst.city.toLowerCase().includes(queryText) ||
+      inst.state.toLowerCase().includes(queryText)
+    );
+  }, [query, uniqueInstitutes]);
 
   const openInstitute = async (inst) => {
     setSelectedInstitute(inst);

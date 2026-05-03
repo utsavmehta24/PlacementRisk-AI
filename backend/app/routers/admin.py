@@ -15,6 +15,23 @@ from app.workflows.backfill_scores import backfill_missing_risk_scores
 router = APIRouter()
 
 
+def _filter_unique_institutes(institutes):
+    seen = set()
+    unique = []
+    for inst in institutes:
+        key = (
+            inst.institute_name.strip().lower(),
+            inst.city.strip().lower(),
+            inst.state.strip().lower(),
+            (inst.region or "").strip().lower(),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(inst)
+    return unique
+
+
 @router.get("/users")
 async def list_users(role: Optional[str] = Query(None), db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     q = db.query(User)
@@ -46,6 +63,7 @@ async def list_institutes(search: Optional[str] = Query(None), db: Session = Dep
     if search:
         q = q.filter(Institute.institute_name.ilike(f"%{search}%"))
     institutes = q.order_by(Institute.institute_name.asc()).limit(200).all()
+    institutes = _filter_unique_institutes(institutes)
     return [{"id": str(i.id), "name": i.institute_name, "city": i.city, "state": i.state, "region": i.region} for i in institutes]
 
 

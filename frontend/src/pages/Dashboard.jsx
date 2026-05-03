@@ -23,6 +23,8 @@ function Dashboard() {
         setHeatmapData(heatmapRes.data);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
+        setStats({ total_students: 0, high_risk_percentage: 0, avg_placement_prob_6mo: 0, alerts_today: 0 });
+        setHeatmapData({ cells: [], total_students: 0, high_risk_percentage: 0 });
       } finally {
         setLoading(false);
       }
