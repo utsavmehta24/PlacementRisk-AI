@@ -1,0 +1,15 @@
+artifact_uri: /app/mlruns/832857692754829887/bfdfbe53c29d4c258186d6662d3d0265/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '832857692754829887'
+lifecycle_stage: active
+run_id: bfdfbe53c29d4c258186d6662d3d0265
+run_name: salary_estimator
+run_uuid: bfdfbe53c29d4c258186d6662d3d0265
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1777832665383
+status: 1
+tags: []
+user_id: root
