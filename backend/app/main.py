@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import risk, portfolio, student, auth, admin, officer, student_portal, cases, messages
+from app.routers import risk, portfolio, student, auth, admin, officer, student_portal, cases, messages, mlflow_proxy
 
 settings = get_settings()
 
@@ -51,6 +51,7 @@ app.include_router(officer.router, prefix="/api/officer", tags=["Officer"])
 app.include_router(student_portal.router, prefix="/api/student-portal", tags=["Student Portal"])
 app.include_router(cases.router, prefix="/api/cases", tags=["Cases"])
 app.include_router(messages.router, prefix="/api/messages", tags=["Messaging"])
+app.include_router(mlflow_proxy.router, prefix="/api/mlflow", tags=["MLflow"])
 
 
 @app.get("/")

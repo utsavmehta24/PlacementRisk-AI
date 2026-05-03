@@ -75,10 +75,12 @@ async def institute_students(institute_id: str, limit: int = Query(200, le=1000)
 
 @router.get("/monitoring")
 async def monitoring(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    from app.config import get_settings
+    _settings = get_settings()
     total_cases = db.query(func.count(StudentCase.id)).scalar() or 0
     open_cases = db.query(func.count(StudentCase.id)).filter(StudentCase.current_status.in_(["NEW", "UNDER_REVIEW", "ACTION_PROPOSED", "IN_PROGRESS"])) .scalar() or 0
     return {
-        "mlflow_url": "http://localhost:5000",
+        "mlflow_url": _settings.mlflow_tracking_uri,
         "airflow_url": "http://localhost:8080",
         "total_cases": total_cases,
         "open_cases": open_cases,

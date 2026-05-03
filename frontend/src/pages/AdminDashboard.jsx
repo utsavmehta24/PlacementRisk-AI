@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminAPI, portfolioAPI } from '../api/client';
+import { adminAPI, portfolioAPI, mlflowAPI } from '../api/client';
 
 function StatCard({ label, value, sub, color, icon }) {
   return (
@@ -32,10 +32,45 @@ function AdminDashboard() {
   const [opsLoading, setOpsLoading] = useState('');
   const [activeTab, setActiveTab] = useState('system');
 
+  // MLflow state
+  const [mlflowSummary, setMlflowSummary] = useState(null);
+  const [mlflowLoading, setMlflowLoading] = useState(false);
+  const [mlflowError, setMlflowError] = useState('');
+  const [selectedExperiment, setSelectedExperiment] = useState(null);
+  const [experimentRuns, setExperimentRuns] = useState([]);
+  const [runsLoading, setRunsLoading] = useState(false);
+  const [selectedRun, setSelectedRun] = useState(null);
+
   const loadStats = async () => {
     const [s, m] = await Promise.all([portfolioAPI.getStats(), adminAPI.getMonitoring()]);
     setStats(s.data);
     setMonitoring(m.data);
+  };
+
+  const loadMlflow = async () => {
+    setMlflowLoading(true);
+    setMlflowError('');
+    try {
+      const resp = await mlflowAPI.getSummary();
+      setMlflowSummary(resp.data);
+    } catch (e) {
+      setMlflowError('Could not load MLflow data: ' + (e.response?.data?.detail || e.message));
+    } finally {
+      setMlflowLoading(false);
+    }
+  };
+
+  const loadExperimentRuns = async (experimentId) => {
+    setRunsLoading(true);
+    setSelectedRun(null);
+    try {
+      const resp = await mlflowAPI.getRuns(experimentId, { max_results: 50 });
+      setExperimentRuns(resp.data);
+    } catch (e) {
+      setExperimentRuns([]);
+    } finally {
+      setRunsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -49,6 +84,12 @@ function AdminDashboard() {
     };
     load();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'mlflow') {
+      loadMlflow();
+    }
+  }, [activeTab]);
 
   const uniqueInstitutes = useMemo(() => {
     const seen = new Set();
@@ -97,6 +138,7 @@ function AdminDashboard() {
 
   const tabs = [
     { id: 'system', label: '🖥 System' },
+    { id: 'mlflow', label: '🧪 MLflow' },
     { id: 'institutes', label: `🏛 Institutes (${uniqueInstitutes.length})` },
     { id: 'users', label: `👤 Users (${users.length})` },
     { id: 'ops', label: '⚙️ Operations' },
@@ -138,7 +180,7 @@ function AdminDashboard() {
                 <h3 className="font-semibold mb-4">MLOps Services</h3>
                 <div className="space-y-3">
                   {[
-                    { label: 'MLflow Experiment Tracker', url: 'http://localhost:5000', icon: '🧪', desc: 'Model runs, metrics, artifacts' },
+                    { label: 'MLflow Experiment Tracker', url: monitoring?.mlflow_url || 'http://localhost:5000', icon: '🧪', desc: 'Model runs, metrics, artifacts' },
                     { label: 'Airflow DAG Scheduler', url: 'http://localhost:8080', icon: '🔄', desc: 'Daily feature refresh, weekly retrain' },
                     { label: 'Backend API Docs', url: 'http://localhost:8000/docs', icon: '📖', desc: 'FastAPI Swagger UI' },
                   ].map(({ label, url, icon, desc }) => (
@@ -175,6 +217,206 @@ function AdminDashboard() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* MLFLOW TAB */}
+        {activeTab === 'mlflow' && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">MLflow Experiment Tracker</h2>
+                <p className="text-slate-400 text-sm mt-1">Model runs, metrics, and artifacts from training pipelines.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {mlflowSummary && (
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${mlflowSummary.reachable ? 'bg-emerald-900/60 text-emerald-300' : 'bg-red-900/60 text-red-300'}`}>
+                    {mlflowSummary.reachable ? '● Online' : '● Offline'}
+                  </span>
+                )}
+                <button onClick={loadMlflow} disabled={mlflowLoading}
+                  className="px-3 py-1.5 border border-slate-700 hover:border-slate-500 rounded text-xs text-slate-300 disabled:opacity-50">
+                  {mlflowLoading ? 'Loading…' : '↻ Refresh'}
+                </button>
+                {monitoring?.mlflow_url && (
+                  <a href={monitoring.mlflow_url} target="_blank" rel="noreferrer"
+                    className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 rounded text-xs text-white font-medium">
+                    Open MLflow UI ↗
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {mlflowError && (
+              <div className="bg-red-950/40 border border-red-800 text-red-300 rounded-xl px-4 py-3 text-sm">
+                {mlflowError}
+              </div>
+            )}
+
+            {mlflowLoading && !mlflowSummary && (
+              <div className="text-slate-400 text-sm py-10 text-center">Loading MLflow data…</div>
+            )}
+
+            {mlflowSummary && !mlflowSummary.reachable && (
+              <div className="bg-amber-950/40 border border-amber-800 text-amber-300 rounded-xl px-4 py-4 text-sm">
+                <p className="font-semibold mb-1">MLflow server is not reachable</p>
+                <p className="text-amber-400">Make sure the MLflow container is running. Check with: <code className="bg-slate-800 px-1 rounded">docker-compose ps</code></p>
+              </div>
+            )}
+
+            {mlflowSummary?.reachable && (
+              <>
+                {/* Experiment cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {mlflowSummary.experiments.map((exp) => (
+                    <button key={exp.experiment_id}
+                      onClick={() => {
+                        setSelectedExperiment(exp);
+                        loadExperimentRuns(exp.experiment_id);
+                      }}
+                      className={`text-left bg-slate-900/60 border rounded-xl p-4 transition-all hover:border-purple-600 ${selectedExperiment?.experiment_id === exp.experiment_id ? 'border-purple-600 bg-purple-950/20' : 'border-slate-800'}`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="text-sm font-semibold text-slate-200 truncate">{exp.name}</span>
+                        <span className="text-xs text-slate-500 ml-2 shrink-0">{exp.total_runs} runs</span>
+                      </div>
+                      {exp.latest_run ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${exp.latest_run.status === 'FINISHED' ? 'bg-emerald-900/60 text-emerald-300' : exp.latest_run.status === 'RUNNING' ? 'bg-blue-900/60 text-blue-300' : 'bg-red-900/60 text-red-300'}`}>
+                              {exp.latest_run.status}
+                            </span>
+                            <span className="text-xs text-slate-500 truncate">{exp.latest_run.run_name}</span>
+                          </div>
+                          {Object.keys(exp.latest_run.metrics).length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {Object.entries(exp.latest_run.metrics).slice(0, 4).map(([k, v]) => (
+                                <div key={k} className="bg-slate-800/80 rounded px-2 py-1">
+                                  <span className="text-xs text-slate-400">{k}: </span>
+                                  <span className="text-xs font-mono text-slate-200">
+                                    {typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(4)) : v}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">No runs yet</p>
+                      )}
+                    </button>
+                  ))}
+                  {mlflowSummary.experiments.length === 0 && (
+                    <div className="col-span-3 text-center py-10 text-slate-500 text-sm">
+                      No experiments found. Run the training pipeline to create experiments.
+                    </div>
+                  )}
+                </div>
+
+                {/* Runs table */}
+                {selectedExperiment && (
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold">Runs — {selectedExperiment.name}</h3>
+                      {runsLoading && <span className="text-xs text-slate-400">Loading…</span>}
+                    </div>
+                    {!runsLoading && experimentRuns.length === 0 && (
+                      <p className="text-slate-500 text-sm">No runs found for this experiment.</p>
+                    )}
+                    {experimentRuns.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-800/80 text-slate-300 text-xs uppercase tracking-wide">
+                            <tr>
+                              <th className="px-3 py-2 text-left">Run</th>
+                              <th className="px-3 py-2 text-left">Status</th>
+                              <th className="px-3 py-2 text-left">Started</th>
+                              <th className="px-3 py-2 text-left">Metrics</th>
+                              <th className="px-3 py-2 text-left">Params</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800">
+                            {experimentRuns.map((run) => (
+                              <tr key={run.run_id}
+                                onClick={() => setSelectedRun(selectedRun?.run_id === run.run_id ? null : run)}
+                                className="hover:bg-slate-800/40 cursor-pointer">
+                                <td className="px-3 py-2.5">
+                                  <div className="font-medium text-slate-200 text-xs">{run.run_name || '—'}</div>
+                                  <div className="text-slate-500 text-xs font-mono">{run.run_id?.slice(0, 8)}…</div>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${run.status === 'FINISHED' ? 'bg-emerald-900/60 text-emerald-300' : run.status === 'RUNNING' ? 'bg-blue-900/60 text-blue-300' : 'bg-red-900/60 text-red-300'}`}>
+                                    {run.status}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5 text-xs text-slate-400">
+                                  {run.start_time ? new Date(run.start_time).toLocaleString() : '—'}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex flex-wrap gap-1">
+                                    {Object.entries(run.metrics || {}).slice(0, 3).map(([k, v]) => (
+                                      <span key={k} className="text-xs bg-slate-800 rounded px-1.5 py-0.5 font-mono text-slate-300">
+                                        {k}: {typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(3)) : v}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <div className="flex flex-wrap gap-1">
+                                    {Object.entries(run.params || {}).slice(0, 2).map(([k, v]) => (
+                                      <span key={k} className="text-xs bg-slate-800 rounded px-1.5 py-0.5 font-mono text-slate-400">
+                                        {k}: {v}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* Expanded run detail */}
+                    {selectedRun && (
+                      <div className="mt-4 bg-slate-800/60 border border-slate-700 rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-semibold text-sm">{selectedRun.run_name} — Full Details</h4>
+                          <button onClick={() => setSelectedRun(null)} className="text-slate-400 hover:text-slate-200 text-xs">✕ Close</button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">All Metrics</p>
+                            <div className="space-y-1">
+                              {Object.entries(selectedRun.metrics || {}).map(([k, v]) => (
+                                <div key={k} className="flex justify-between text-sm">
+                                  <span className="text-slate-400">{k}</span>
+                                  <span className="font-mono text-slate-200">
+                                    {typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(6)) : v}
+                                  </span>
+                                </div>
+                              ))}
+                              {Object.keys(selectedRun.metrics || {}).length === 0 && <p className="text-xs text-slate-500">No metrics logged</p>}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">All Parameters</p>
+                            <div className="space-y-1">
+                              {Object.entries(selectedRun.params || {}).map(([k, v]) => (
+                                <div key={k} className="flex justify-between text-sm">
+                                  <span className="text-slate-400">{k}</span>
+                                  <span className="font-mono text-slate-200">{v}</span>
+                                </div>
+                              ))}
+                              {Object.keys(selectedRun.params || {}).length === 0 && <p className="text-xs text-slate-500">No params logged</p>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

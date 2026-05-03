@@ -80,6 +80,14 @@ export const adminAPI = {
   generateAlerts: () => apiClient.post('/api/admin/generate-alerts'),
 };
 
+export const mlflowAPI = {
+  getStatus: () => apiClient.get('/api/mlflow/status'),
+  getSummary: () => apiClient.get('/api/mlflow/summary'),
+  getExperiments: () => apiClient.get('/api/mlflow/experiments'),
+  getRuns: (experimentId, params) => apiClient.get(`/api/mlflow/experiments/${experimentId}/runs`, { params }),
+  getRun: (runId) => apiClient.get(`/api/mlflow/runs/${runId}`),
+};
+
 export const officerAPI = {
   getDashboard: () => apiClient.get('/api/officer/dashboard'),
   searchStudents: (params) => apiClient.get('/api/officer/students', { params }),

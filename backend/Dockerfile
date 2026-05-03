@@ -50,22 +50,20 @@ RUN pip install --no-cache-dir --timeout=1000 --retries=5 \
 RUN pip install --no-cache-dir --timeout=1000 --retries=5 \
     torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
 
-# Install remaining ML packages
-RUN pip install --no-cache-dir --timeout=1000 --retries=5 \
-    xgboost==2.1.2 \
-    lightgbm==4.5.0 \
-    shap==0.46.0 \
-    transformers==4.46.3 \
-    river==0.21.2
+# Install remaining ML packages (one per layer to survive network drops)
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 xgboost==2.1.2
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 lightgbm==4.5.0
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 shap==0.46.0
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 transformers==4.46.3
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 river==0.21.2
 
-# Install data processing and MLOps packages
-RUN pip install --no-cache-dir --timeout=1000 --retries=5 \
-    pyarrow==17.0.0 \
-    mlflow==2.17.2 \
-    feast==0.40.1 \
-    sdv==1.16.2 \
-    great-expectations==1.17.0 \
-    evidently==0.4.16
+# Install data processing and MLOps packages (one per layer to survive network drops)
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 pyarrow==17.0.0
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 mlflow==2.17.2
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 feast==0.40.1
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 sdv==1.16.2
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 great-expectations==1.17.0
+RUN pip install --no-cache-dir --timeout=1000 --retries=5 evidently==0.4.16
 
 # Install web scraping packages
 RUN pip install --no-cache-dir --timeout=1000 --retries=5 \
