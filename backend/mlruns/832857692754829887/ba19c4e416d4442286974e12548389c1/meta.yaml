@@ -1,0 +1,15 @@
+artifact_uri: /app/mlruns/832857692754829887/ba19c4e416d4442286974e12548389c1/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '832857692754829887'
+lifecycle_stage: active
+run_id: ba19c4e416d4442286974e12548389c1
+run_name: placement_classifier_6mo
+run_uuid: ba19c4e416d4442286974e12548389c1
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1777830619418
+status: 1
+tags: []
+user_id: root
