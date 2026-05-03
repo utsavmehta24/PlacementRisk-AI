@@ -77,7 +77,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
     
     role_home_route = {
         "admin": "/admin",
-        "risk_head": "/officer",
+        "risk_head": "/risk-head",
         "loan_officer": "/officer",
         "student": "/student-portal",
     }.get(user.role, "/")
