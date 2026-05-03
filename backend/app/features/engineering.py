@@ -301,8 +301,8 @@ def refresh_feature_store():
     try:
         from pathlib import Path
         
-        # Check if data files exist
-        data_dir = Path("/data/processed")
+        # Use synthetic data directory (where actual data lives)
+        data_dir = Path("/data/synthetic")
         if not data_dir.exists():
             print("⚠ Warning: Data directory not found. Skipping feature refresh.")
             return
@@ -310,7 +310,7 @@ def refresh_feature_store():
         # Load latest data
         students_file = data_dir / "students.csv"
         institutes_file = data_dir / "institutes.csv"
-        job_signals_file = data_dir / "job_signals.csv"
+        job_signals_file = data_dir / "job_market_signals.csv"
         
         if not all([students_file.exists(), institutes_file.exists(), job_signals_file.exists()]):
             print("⚠ Warning: Required data files not found. Skipping feature refresh.")
@@ -368,9 +368,11 @@ def refresh_feature_store():
             features["student_id"] = student["id"]
             current_features.append(features)
         
-        # Save to feature store
+        # Save to feature store (create processed dir if needed)
+        output_dir = Path("/data/processed")
+        output_dir.mkdir(parents=True, exist_ok=True)
         features_df = pd.DataFrame(current_features)
-        output_file = data_dir / "current_features.csv"
+        output_file = output_dir / "current_features.csv"
         features_df.to_csv(output_file, index=False)
         
         print(f"✓ Feature store refreshed with {len(features_df)} records")
