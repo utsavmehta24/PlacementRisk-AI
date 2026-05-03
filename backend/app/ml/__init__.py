@@ -1,1 +1,1 @@
-# ML module
+"""PlacementRisk AI package module."""

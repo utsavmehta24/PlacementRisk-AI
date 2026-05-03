@@ -8,151 +8,89 @@ function Alerts() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const loadAlerts = async () => {
+      try {
+        const response = await portfolioAPI.getAlerts({ limit: 50 });
+        setAlerts(response.data);
+      } catch (error) {
+        console.error('Error loading alerts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadAlerts();
   }, []);
-
-  const loadAlerts = async () => {
-    try {
-      const response = await portfolioAPI.getAlerts({ limit: 50 });
-      setAlerts(response.data);
-    } catch (error) {
-      console.error('Error loading alerts:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleInitiateSupport = async (studentId) => {
     try {
       await studentAPI.initiateAction(studentId, 'skill_up');
-      alert('Support action initiated successfully!');
+      alert('Support action initiated successfully.');
     } catch (error) {
       console.error('Error initiating support:', error);
       alert('Failed to initiate support action');
     }
   };
 
-  const getSeverityColor = (severity) => {
+  const getSeverityClass = (severity) => {
     switch (severity.toLowerCase()) {
       case 'high':
-        return 'bg-red-100 text-red-800';
+        return 'bg-risk-high text-white';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-risk-medium text-slate-900';
       default:
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-200 text-blue-900';
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading alerts...</div>
-      </div>
-    );
+    return <div className="min-h-screen grid place-items-center text-lg">Loading alerts...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <header className="border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Early Warning Alerts</h1>
-            <p className="text-sm text-gray-600">Students requiring immediate attention</p>
+            <h1 className="text-2xl font-bold">Early Warning Alerts</h1>
+            <p className="text-sm text-slate-400">Event-driven deteriorating risk signals</p>
           </div>
-          <button
-            onClick={() => navigate('/')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Back to Dashboard
-          </button>
+          <button onClick={() => navigate('/')} className="px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-500">Back to Dashboard</button>
         </div>
       </header>
 
-      {/* Alerts List */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-800 text-slate-300">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Student
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Institute
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Course
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Severity
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Score Change
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Message
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-4 py-3 text-left">Student</th>
+                <th className="px-4 py-3 text-left">Institute</th>
+                <th className="px-4 py-3 text-left">Course</th>
+                <th className="px-4 py-3 text-left">Severity</th>
+                <th className="px-4 py-3 text-left">Score Change</th>
+                <th className="px-4 py-3 text-left">Message</th>
+                <th className="px-4 py-3 text-left">Action</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-slate-800">
               {alerts.map((alert) => (
-                <tr key={alert.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => navigate(`/student/${alert.student_id}`)}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-900"
-                    >
-                      {alert.student_name}
-                    </button>
+                <tr key={alert.id} className="hover:bg-slate-800/60">
+                  <td className="px-4 py-3">
+                    <button onClick={() => navigate(`/student/${alert.student_id}`)} className="text-blue-300 hover:text-blue-200 font-medium">{alert.student_name}</button>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {alert.institute_name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {alert.course_type}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getSeverityColor(
-                        alert.severity
-                      )}`}
-                    >
-                      {alert.severity.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {alert.score_change && (
-                      <span className="text-red-600 font-medium">
-                        {alert.score_change > 0 ? '+' : ''}
-                        {(alert.score_change * 100).toFixed(1)}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
-                    {alert.message}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <button
-                      onClick={() => handleInitiateSupport(alert.student_id)}
-                      className="text-blue-600 hover:text-blue-900 font-medium"
-                    >
-                      Initiate Support
-                    </button>
-                  </td>
+                  <td className="px-4 py-3">{alert.institute_name}</td>
+                  <td className="px-4 py-3">{alert.course_type}</td>
+                  <td className="px-4 py-3"><span className={`px-2 py-1 rounded-md text-xs font-semibold ${getSeverityClass(alert.severity)}`}>{alert.severity.toUpperCase()}</span></td>
+                  <td className="px-4 py-3 text-risk-high">{alert.score_change ? `${alert.score_change > 0 ? '+' : ''}${(alert.score_change * 100).toFixed(1)}%` : '-'}</td>
+                  <td className="px-4 py-3">{alert.message}</td>
+                  <td className="px-4 py-3"><button onClick={() => handleInitiateSupport(alert.student_id)} className="text-amber-300 hover:text-amber-200">Initiate Support</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          {alerts.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No active alerts at this time</p>
-            </div>
-          )}
+          {alerts.length === 0 && <div className="text-center py-10 text-slate-400">No active alerts at this time.</div>}
         </div>
       </main>
     </div>

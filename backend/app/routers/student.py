@@ -67,9 +67,23 @@ async def get_student_profile(
             "salary_p10": latest_score.salary_p10,
             "salary_p50": latest_score.salary_p50,
             "salary_p90": latest_score.salary_p90,
+            "placement_momentum_score": latest_score.placement_momentum_score,
+            "market_alignment_score": latest_score.market_alignment_score,
+            "repayment_buffer_score": latest_score.repayment_buffer_score,
             "shap_explanation": latest_score.shap_explanation,
+            "next_best_action": None,
+            "action_resources": None,
             "scored_at": latest_score.scored_at
         }
+
+        from app.ml.shap_explainer import get_next_best_action, get_action_resources
+        next_action = get_next_best_action(
+            latest_score.risk_level.value,
+            latest_score.shap_explanation,
+            {"cgpa": student.cgpa, "internship_count": student.internship_count}
+        )
+        latest_risk_data["next_best_action"] = next_action
+        latest_risk_data["action_resources"] = get_action_resources(next_action) if next_action else None
     
     return StudentProfile(
         id=str(student.id),

@@ -1,1 +1,1 @@
-# Database models
+"""PlacementRisk AI package module."""

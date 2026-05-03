@@ -1,1 +1,1 @@
-# Authentication module
+"""PlacementRisk AI package module."""

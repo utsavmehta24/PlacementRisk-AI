@@ -8,12 +8,45 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal, init_db
 from app.models.schemas import (
     Institute, Student, PlacementOutcome, JobMarketSignal,
-    CourseType, EmployerType, NIRFRankBand, TrendType, OutcomeLabel
+    CourseType, EmployerType, NIRFRankBand, TrendType, OutcomeLabel,
+    RiskScore, EarlyWarningAlert, ActionLog, StudentCase, CaseEvent,
+    StudentMessage, ApprovalDecision, StudentUserLink, User
 )
 
 # Set random seed for reproducibility
 SEED = 42
 np.random.seed(SEED)
+
+TOP_INSTITUTES = [
+    "IIT Bombay", "IIT Delhi", "IIT Madras", "IIT Kanpur", "IIT Kharagpur",
+    "IIT Roorkee", "IIT Guwahati", "IIT Hyderabad", "IIT Indore", "IIT BHU",
+    "IISc Bangalore", "BITS Pilani", "NIT Trichy", "NIT Surathkal", "NIT Warangal",
+    "VIT Vellore", "SRM Institute of Science and Technology", "Manipal Institute of Technology",
+    "IIIT Hyderabad", "IIIT Bangalore", "Delhi Technological University",
+    "Jadavpur University", "College of Engineering Pune", "Anna University",
+    "PSG College of Technology", "Amrita Vishwa Vidyapeetham", "Thapar Institute of Engineering and Technology",
+    "Jamia Millia Islamia", "Aligarh Muslim University", "Savitribai Phule Pune University"
+]
+
+INSTITUTE_PREFIXES = [
+    "National Institute of Technology", "Government Engineering College",
+    "Institute of Management and Technology", "College of Engineering",
+    "University School of Technology", "School of Business and Finance",
+    "Institute of Health Sciences", "Institute of Legal Studies"
+]
+
+FIRST_NAMES = [
+    "Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Sai", "Reyansh", "Krishna", "Ishaan", "Kabir",
+    "Ananya", "Aadhya", "Diya", "Myra", "Sara", "Ira", "Riya", "Anika", "Navya", "Saanvi",
+    "Rahul", "Rohan", "Karan", "Aman", "Akash", "Siddharth", "Nikhil", "Harsh", "Yash", "Varun",
+    "Priya", "Neha", "Pooja", "Sneha", "Aisha", "Meera", "Kavya", "Nandini", "Ishita", "Ritika"
+]
+
+LAST_NAMES = [
+    "Sharma", "Verma", "Gupta", "Mehta", "Reddy", "Nair", "Iyer", "Patel", "Singh", "Kumar",
+    "Joshi", "Agarwal", "Chopra", "Banerjee", "Mukherjee", "Das", "Mishra", "Yadav", "Chaudhary", "Jain",
+    "Bansal", "Kulkarni", "Deshmukh", "Pillai", "Menon", "Saxena", "Tiwari", "Pandey", "Sinha", "Roy"
+]
 
 
 def generate_institutes(n_institutes=3000) -> pd.DataFrame:
@@ -38,8 +71,10 @@ def generate_institutes(n_institutes=3000) -> pd.DataFrame:
         "Punjab": "North", "Madhya Pradesh": "Central"
     }
     
-    rank_bands = [NIRFRankBand.TOP10, NIRFRankBand.RANK_11_50, NIRFRankBand.RANK_51_100,
-                  NIRFRankBand.RANK_101_200, NIRFRankBand.RANK_201_500, NIRFRankBand.UNRANKED]
+    rank_bands = [b.value for b in [
+        NIRFRankBand.TOP10, NIRFRankBand.RANK_11_50, NIRFRankBand.RANK_51_100,
+        NIRFRankBand.RANK_101_200, NIRFRankBand.RANK_201_500, NIRFRankBand.UNRANKED
+    ]]
     rank_weights = [0.003, 0.013, 0.017, 0.033, 0.100, 0.834]  # NIRF-realistic distribution
     
     institutes = []
@@ -50,29 +85,35 @@ def generate_institutes(n_institutes=3000) -> pd.DataFrame:
         rank_band = np.random.choice(rank_bands, p=rank_weights)
         
         # Better institutes have higher placement rates
-        if rank_band == NIRFRankBand.TOP10:
+        if rank_band == NIRFRankBand.TOP10.value:
             base_placement = 0.95
             median_salary = np.random.randint(1200000, 2500000)
-        elif rank_band == NIRFRankBand.RANK_11_50:
+        elif rank_band == NIRFRankBand.RANK_11_50.value:
             base_placement = 0.85
             median_salary = np.random.randint(800000, 1500000)
-        elif rank_band == NIRFRankBand.RANK_51_100:
+        elif rank_band == NIRFRankBand.RANK_51_100.value:
             base_placement = 0.75
             median_salary = np.random.randint(600000, 1000000)
-        elif rank_band == NIRFRankBand.RANK_101_200:
+        elif rank_band == NIRFRankBand.RANK_101_200.value:
             base_placement = 0.65
             median_salary = np.random.randint(450000, 750000)
-        elif rank_band == NIRFRankBand.RANK_201_500:
+        elif rank_band == NIRFRankBand.RANK_201_500.value:
             base_placement = 0.50
             median_salary = np.random.randint(350000, 600000)
         else:
             base_placement = 0.35
             median_salary = np.random.randint(250000, 450000)
         
+        if i < len(TOP_INSTITUTES):
+            institute_name = TOP_INSTITUTES[i]
+        else:
+            prefix = np.random.choice(INSTITUTE_PREFIXES)
+            institute_name = f"{prefix}, {city} Campus {i - len(TOP_INSTITUTES) + 1}"
+
         institutes.append({
             "id": str(uuid.uuid4()),
-            "institute_name": f"Institute_{i+1}_{city}",
-            "nirf_rank_band": rank_band.value,
+            "institute_name": institute_name,
+            "nirf_rank_band": rank_band,
             "city": city,
             "state": state,
             "region": region,
@@ -118,9 +159,12 @@ def generate_students(institutes_df: pd.DataFrame, n_students=50000) -> pd.DataF
         loan_amount = np.random.randint(200000, 2500000)
         emi_monthly = loan_amount // 60  # 5-year loan
         
+        first_name = np.random.choice(FIRST_NAMES)
+        last_name = np.random.choice(LAST_NAMES)
+
         students.append({
             "id": str(uuid.uuid4()),
-            "student_name": f"Student_{i+1}",
+            "student_name": f"{first_name} {last_name}",
             "course_type": course_type,
             "cgpa": round(cgpa, 2),
             "academic_consistency_score": np.random.uniform(0.5, 1.0),
@@ -237,6 +281,22 @@ def load_to_database(institutes_df, students_df, outcomes_df, signals_df):
     
     db = SessionLocal()
     try:
+        print("Resetting synthetic domain tables...")
+        db.query(StudentMessage).delete(synchronize_session=False)
+        db.query(ApprovalDecision).delete(synchronize_session=False)
+        db.query(CaseEvent).delete(synchronize_session=False)
+        db.query(StudentCase).delete(synchronize_session=False)
+        db.query(ActionLog).delete(synchronize_session=False)
+        db.query(EarlyWarningAlert).delete(synchronize_session=False)
+        db.query(RiskScore).delete(synchronize_session=False)
+        db.query(PlacementOutcome).delete(synchronize_session=False)
+        db.query(StudentUserLink).delete(synchronize_session=False)
+        db.query(Student).delete(synchronize_session=False)
+        db.query(Institute).delete(synchronize_session=False)
+        db.query(JobMarketSignal).delete(synchronize_session=False)
+        db.query(User).filter(User.role == "student").delete(synchronize_session=False)
+        db.commit()
+
         # Load institutes
         print("Loading institutes...")
         for _, row in institutes_df.iterrows():
@@ -255,7 +315,12 @@ def load_to_database(institutes_df, students_df, outcomes_df, signals_df):
         # Load placement outcomes
         print("Loading placement outcomes...")
         for _, row in outcomes_df.iterrows():
-            outcome = PlacementOutcome(**row.to_dict())
+            row_dict = row.to_dict()
+            # Convert pandas NaN/NaT to None for nullable DB fields.
+            for k in ["actual_placement_months", "actual_salary", "placement_date"]:
+                if pd.isna(row_dict.get(k)):
+                    row_dict[k] = None
+            outcome = PlacementOutcome(**row_dict)
             db.add(outcome)
         db.commit()
         

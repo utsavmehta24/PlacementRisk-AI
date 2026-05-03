@@ -1,6 +1,7 @@
 """JWT token management"""
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from uuid import UUID
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import get_db
-from app.models.schemas import User
+from app.models.schemas import User, StudentUserLink
 
 settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -83,9 +84,21 @@ async def get_current_user(
     return user
 
 
-def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
-    """Authenticate a user by email and password"""
-    user = db.query(User).filter(User.email == email).first()
+def authenticate_user(db: Session, identifier: str, password: str) -> Optional[User]:
+    """Authenticate a user by email or seeded student ID plus password."""
+    user = db.query(User).filter(User.email == identifier).first()
+
+    if not user:
+        try:
+            student_uuid = UUID(identifier)
+        except ValueError:
+            student_uuid = None
+
+        if student_uuid:
+            link = db.query(StudentUserLink).filter(StudentUserLink.student_id == student_uuid).first()
+            if link:
+                user = db.query(User).filter(User.id == link.user_id).first()
+
     if not user:
         return None
     if not verify_password(password, user.hashed_password):

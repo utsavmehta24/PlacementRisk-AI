@@ -1,1 +1,1 @@
-# PlacementRisk AI Backend Application
+"""PlacementRisk AI package module."""

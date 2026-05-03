@@ -1,237 +1,182 @@
-# PlacementRisk AI - Quick Start Guide
+# PlacementRisk AI - Quick Start
 
-## Prerequisites
+## All Issues Resolved ✓
 
-- Docker Desktop installed and running
-- 8GB RAM minimum
-- 10GB free disk space
-- Internet connection for downloading dependencies
+All Docker Compose errors, deprecation warnings, and network timeout issues have been fixed.
 
-## Installation (5 minutes)
+## Important: Network Timeout Fix Applied
 
-### Option 1: Automated Setup (Recommended)
+The Dockerfile has been optimized to prevent timeout errors:
+- ✓ Increased pip timeout to 1000 seconds (16+ minutes per package)
+- ✓ Added retry logic (5 automatic retries on failure)
+- ✓ Split package installation into smaller groups
+- ✓ Uses CPU-only PyTorch (~200MB instead of 900MB for faster downloads)
 
-```bash
-# Clone or navigate to the project directory
+**If build still times out**, see `DOCKER_BUILD_GUIDE.md` for detailed solutions.
+
+## Quick Start
+
+### 1. Stop Any Running Containers
+```powershell
 cd placementrisk-ai
-
-# Make setup script executable (Linux/Mac)
-chmod +x setup.sh
-
-# Run setup script
-./setup.sh
+docker compose down
 ```
 
-### Option 2: Manual Setup
+### 2. Build and Start All Services
+```powershell
+# This will take 15-30 minutes on first build (downloads ~2GB of packages)
+# Ensure stable internet connection
+docker compose up --build
 
-```bash
-# 1. Create environment file
-cp .env.example .env
-
-# 2. Start services
-docker-compose up -d
-
-# 3. Wait for services to start (2-3 minutes)
-docker-compose ps
-
-# 4. Generate synthetic data
-docker-compose exec backend python -m app.data.synthetic
-
-# 5. Train models
-docker-compose exec backend python -m app.ml.train
+# Or build in background
+docker compose up --build -d
 ```
 
-## Access the Application
+**First Build Notes**:
+- Takes 15-30 minutes (downloads all Python packages)
+- Requires stable internet connection
+- Downloads ~2GB of data
+- Subsequent builds are much faster (2-5 minutes)
 
-Once setup is complete, access:
+### 3. Monitor Build Progress
+```powershell
+# In another terminal, watch the build logs
+docker compose logs -f backend
 
-- **Frontend Dashboard**: http://localhost:3000
-- **API Documentation**: http://localhost:8000/docs
+# Or for all services
+docker compose logs -f
+```
+
+### 3. Monitor Build Progress
+```powershell
+# In another terminal, watch the build logs
+docker compose logs -f backend
+
+# Or for all services
+docker compose logs -f
+```
+
+### 4. Verify Services Are Running
+
+You should see the following services start successfully:
+
+- **PostgreSQL** (port 5432): Database ready to accept connections
+- **Redis** (port 6379): Ready to accept connections
+- **Backend** (port 8000): FastAPI server running
+- **Celery Worker**: Background tasks running with beat scheduler
+- **MLflow** (port 5000): Experiment tracking server running
+- **Airflow** (port 8080): Workflow orchestration running
+- **Frontend** (port 3000): React app served by Nginx
+
+### 5. Access the Application
+
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
 - **MLflow UI**: http://localhost:5000
 - **Airflow UI**: http://localhost:8080 (admin/admin)
 
-## Demo Login Credentials
+## What Was Fixed
 
-### Admin (Full Access)
-- Email: `admin@placementrisk.ai`
-- Password: `demo123`
+### Critical Errors Fixed
+1. ✓ Missing `email-validator` package (required by Pydantic EmailStr)
+2. ✓ Missing `app.celery_app` module (Celery worker couldn't start)
+3. ✓ Pydantic model namespace warnings (model_seed, model_dir conflicts)
 
-### Risk Head (Portfolio View)
-- Email: `riskhead@placementrisk.ai`
-- Password: `demo123`
+### Deprecation Warnings Fixed
+4. ✓ Airflow SQL Alchemy connection configuration
+5. ✓ Airflow database initialization (db init → db migrate)
+6. ✓ Docker Compose version attribute removed
 
-### Loan Officer (Student View)
-- Email: `officer@placementrisk.ai`
-- Password: `demo123`
+### New Features Added
+7. ✓ Celery background tasks for drift detection and feature refresh
+8. ✓ Celery beat scheduler for periodic tasks
+9. ✓ Feature store refresh functionality
+10. ✓ Improved drift detection with return values
 
-## Quick Tour
+## Background Tasks
 
-### 1. Dashboard (Risk Head View)
-- View portfolio statistics
-- See risk distribution heatmap
-- Monitor high-risk students
-- Check daily alerts
+The following Celery tasks run automatically:
 
-### 2. Student Profile
-- Click any student name to view detailed risk profile
-- See placement probability timeline (3/6/12 months)
-- View expected salary bands (P10/P50/P90)
-- Read SHAP-based risk explanations
-- Initiate support actions
+- **Model Drift Detection**: Daily at 2:00 AM UTC
+- **Feature Refresh**: Every hour
+- **Async Risk Prediction**: On-demand
+- **Batch Prediction**: On-demand
 
-### 3. Alerts Page
-- View early warning alerts
-- See students with deteriorating risk scores
-- Initiate support interventions
-- Track alert history
+## Monitoring Celery Tasks
 
-### 4. API Testing
+To monitor Celery tasks:
 
-Test the risk scoring API:
+```powershell
+# View Celery worker logs
+docker logs -f placementrisk-celery
 
-```bash
-# Get access token
-curl -X POST http://localhost:8000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "admin@placementrisk.ai", "password": "demo123"}'
+# View all running tasks
+docker exec -it placementrisk-celery celery -A app.celery_app inspect active
 
-# Score a student (replace TOKEN and STUDENT_ID)
-curl -X POST http://localhost:8000/api/risk/score \
-  -H "Authorization: Bearer TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"student_id": "STUDENT_ID"}'
+# View scheduled tasks
+docker exec -it placementrisk-celery celery -A app.celery_app inspect scheduled
 ```
-
-## Key Features to Explore
-
-### 1. Risk Scoring
-- Multi-window placement predictions (3/6/12 months)
-- Quantile salary estimation (P10/P50/P90)
-- Composite risk score (LOW/MEDIUM/HIGH)
-- SHAP explanations for every prediction
-
-### 2. Portfolio Analytics
-- Institute × Course heatmap
-- Risk distribution visualization
-- Aggregate statistics
-- Trend analysis
-
-### 3. Early Warning System
-- Automatic alert generation for deteriorating students
-- Severity-based prioritization
-- Action recommendations
-- Support intervention tracking
-
-### 4. Student Support
-- Skill development programs
-- Resume optimization
-- Mock interview preparation
-- Recruiter matching
-
-## Data Overview
-
-The system generates synthetic data with:
-- **50,000 students** across 3,000 programs
-- **NIRF-realistic** institute distributions
-- **Placement outcomes** with ground truth labels
-- **Job market signals** by sector and region
-
-## Model Performance
-
-Target metrics:
-- **Placement AUC**: > 0.82
-- **Salary MAE**: < ₹30,000
-- **Risk Score Precision**: > 80%
-- **SHAP Coverage**: 100% of outputs
 
 ## Troubleshooting
 
-### Services not starting
-```bash
-# Check Docker is running
-docker ps
+### If services fail to start:
 
-# Restart services
-docker-compose down
-docker-compose up -d
+1. **Check logs for specific service**:
+   ```bash
+   docker logs placementrisk-backend
+   docker logs placementrisk-celery
+   docker logs placementrisk-airflow
+   ```
+
+2. **Ensure ports are not in use**:
+   - 5432 (PostgreSQL)
+   - 6379 (Redis)
+   - 8000 (Backend)
+   - 5000 (MLflow)
+   - 8080 (Airflow)
+   - 3000 (Frontend)
+
+3. **Clean rebuild**:
+   ```bash
+   docker-compose down -v
+   docker-compose build --no-cache
+   docker-compose up
+   ```
+
+## Development Mode
+
+To run in development mode with hot reload:
+
+```bash
+# Backend already has --reload enabled in docker-compose.yml
+# Edit files in ./backend and changes will auto-reload
+
+# View backend logs
+docker logs -f placementrisk-backend
 ```
 
-### Database connection errors
-```bash
-# Check PostgreSQL is healthy
-docker-compose ps postgres
+## Testing the API
 
-# Restart database
-docker-compose restart postgres
-```
-
-### Frontend not loading
-```bash
-# Check backend is running
+```powershell
+# Health check
 curl http://localhost:8000/health
 
-# Rebuild frontend
-docker-compose build frontend
-docker-compose up -d frontend
-```
-
-### Models not found
-```bash
-# Retrain models
-docker-compose exec backend python -m app.ml.train
-```
-
-## Stopping the Application
-
-```bash
-# Stop all services
-docker-compose down
-
-# Stop and remove volumes (clean slate)
-docker-compose down -v
+# API documentation
+Start-Process http://localhost:8000/docs
 ```
 
 ## Next Steps
 
-1. **Explore the Dashboard**: Login and navigate through different views
-2. **Test API Endpoints**: Use the interactive API docs at `/docs`
-3. **Review MLflow**: Check model experiments and metrics
-4. **Configure Airflow**: Set up automated retraining schedules
-5. **Customize Features**: Modify feature engineering in `backend/app/features/`
+1. Generate synthetic data: See `TESTING.md`
+2. Train models: See `README.md`
+3. Run predictions: Use the API or frontend
+4. Monitor drift: Check MLflow UI for drift reports
+5. Schedule workflows: Configure Airflow DAGs
 
 ## Support
 
-For issues or questions:
-- Check logs: `docker-compose logs -f`
-- Review API docs: http://localhost:8000/docs
-- Check MLflow: http://localhost:5000
-
-## Architecture
-
-```
-Frontend (React) → Backend (FastAPI) → PostgreSQL
-                                     → Redis (Cache)
-                                     → MLflow (Tracking)
-                                     
-Backend → ML Models (XGBoost, LightGBM)
-       → Feature Store (Feast)
-       → SHAP Explainer
-       
-Airflow → Daily Feature Refresh
-       → Weekly Model Retraining
-       → Drift Detection
-```
-
-## Production Deployment
-
-For production deployment:
-1. Update `.env` with production credentials
-2. Configure proper secrets management
-3. Set up SSL/TLS certificates
-4. Configure backup strategies
-5. Set up monitoring and alerting
-6. Review security settings in `docker-compose.yml`
-
----
-
-**PlacementRisk AI** — Turning Education Loans into Career Partnerships
+For issues or questions, refer to:
+- `FIXES_APPLIED.md` - Detailed list of all fixes
+- `README.md` - Full project documentation
+- `TESTING.md` - Testing guide

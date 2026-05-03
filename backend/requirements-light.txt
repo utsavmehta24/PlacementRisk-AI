@@ -1,11 +1,10 @@
+# Lightweight requirements for faster builds
+# Uses CPU-only PyTorch and minimal dependencies
+
 # Web Framework
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 python-multipart==0.0.12
-
-# Multipart parser for litestar (required by evidently via litestar dependency)
-# Note: This is a different package from python-multipart; both can coexist
-multipart==1.1.0
 
 # Database
 sqlalchemy==2.0.36
@@ -25,7 +24,7 @@ passlib[bcrypt]==1.7.4
 python-dotenv==1.0.1
 email-validator==2.2.0
 
-# ML Core
+# ML Core (CPU versions)
 numpy==1.26.4
 pandas==2.2.3
 scikit-learn==1.5.2
@@ -36,9 +35,8 @@ shap==0.46.0
 # Feature Store
 feast==0.40.1
 
-# NLP
-transformers==4.46.3
-torch==2.5.1
+# NLP (without torch - will use CPU torch)
+transformers==4.46.0
 
 # Online Learning
 river==0.21.2
@@ -48,7 +46,7 @@ sdv==1.16.2
 
 # Data Quality & Monitoring
 great-expectations==1.17.0
-evidently==0.4.16
+evidently==0.7.21
 
 # MLOps
 mlflow==2.17.2

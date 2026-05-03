@@ -27,32 +27,43 @@ class RiskPredictor:
     def load_models(self):
         """Load all trained models and artifacts"""
         print(f"Loading models from {self.model_dir}...")
+        self.fallback_only = False
         
-        # Load placement models
-        self.placement_models = {}
-        for window in ["3mo", "6mo", "12mo"]:
-            with open(self.model_dir / f"placement_{window}.pkl", "rb") as f:
-                self.placement_models[window] = pickle.load(f)
-        
-        # Load salary models
-        self.salary_models = {}
-        for quantile in ["p10", "p50", "p90"]:
-            with open(self.model_dir / f"salary_{quantile}.pkl", "rb") as f:
-                self.salary_models[quantile] = pickle.load(f)
-        
-        # Load encoders
-        with open(self.model_dir / "encoders.pkl", "rb") as f:
-            self.encoders = pickle.load(f)
-        
-        # Load feature names
-        with open(self.model_dir / "feature_names.json", "r") as f:
-            self.feature_names = json.load(f)
-        
-        # Load metadata
-        with open(self.model_dir / "metadata.json", "r") as f:
-            self.metadata = json.load(f)
-        
-        print(f"✓ Models loaded (version: {self.metadata['version']})")
+        try:
+            # Load placement models
+            self.placement_models = {}
+            for window in ["3mo", "6mo", "12mo"]:
+                with open(self.model_dir / f"placement_{window}.pkl", "rb") as f:
+                    self.placement_models[window] = pickle.load(f)
+            
+            # Load salary models
+            self.salary_models = {}
+            for quantile in ["p10", "p50", "p90"]:
+                with open(self.model_dir / f"salary_{quantile}.pkl", "rb") as f:
+                    self.salary_models[quantile] = pickle.load(f)
+            
+            # Load encoders
+            with open(self.model_dir / "encoders.pkl", "rb") as f:
+                self.encoders = pickle.load(f)
+            
+            # Load feature names
+            with open(self.model_dir / "feature_names.json", "r") as f:
+                self.feature_names = json.load(f)
+            
+            # Load metadata
+            with open(self.model_dir / "metadata.json", "r") as f:
+                self.metadata = json.load(f)
+            
+            print(f"✓ Models loaded (version: {self.metadata['version']})")
+        except FileNotFoundError:
+            # Graceful fallback for demo/dev runs where models were not trained yet.
+            self.fallback_only = True
+            self.placement_models = {}
+            self.salary_models = {}
+            self.encoders = {}
+            self.feature_names = []
+            self.metadata = {"version": "fallback-v1"}
+            print("! Model artifacts not found; using fallback heuristic predictor.")
     
     def prepare_features(self, student_data: Dict, institute_data: Dict, 
                         job_market_data: Dict) -> np.ndarray:
@@ -136,13 +147,36 @@ class RiskPredictor:
         # Prepare features
         X, engineered_features = self.prepare_features(
             student_data, institute_data, job_market_data
-        )
-        
-        # Predict placement probabilities
-        placement_preds = self.predict_placement(X)
-        
-        # Predict salary bands
-        salary_preds = self.predict_salary(X)
+        ) if not self.fallback_only else (None, engineer_features(student_data, institute_data, job_market_data))
+
+        if self.fallback_only:
+            cgpa = float(student_data.get("cgpa", 7.0))
+            internships = float(student_data.get("internship_count", 0))
+            inst_rate_6 = float(institute_data.get("placement_rate_6mo", 0.5))
+            market = float(job_market_data.get("job_demand_index", 0.5))
+            base = (0.35 * (cgpa / 10.0)) + (0.2 * min(internships / 3.0, 1.0)) + (0.3 * inst_rate_6) + (0.15 * market)
+            p6 = min(max(base, 0.05), 0.95)
+            p3 = min(max(p6 - 0.18, 0.02), 0.9)
+            p12 = min(max(p6 + 0.2, 0.1), 0.98)
+            median_salary = int(institute_data.get("median_salary", 600000))
+            cgpa_factor = (cgpa - 7.0) * 45000
+            market_factor = (market - 0.5) * 140000
+            salary_p50 = max(180000, int(median_salary + cgpa_factor + market_factor))
+            placement_preds = {
+                "placement_prob_3mo": round(p3, 4),
+                "placement_prob_6mo": round(p6, 4),
+                "placement_prob_12mo": round(p12, 4),
+            }
+            salary_preds = {
+                "salary_p10": int(salary_p50 * 0.72),
+                "salary_p50": int(salary_p50),
+                "salary_p90": int(salary_p50 * 1.35),
+            }
+        else:
+            # Predict placement probabilities
+            placement_preds = self.predict_placement(X)
+            # Predict salary bands
+            salary_preds = self.predict_salary(X)
         
         # Compute risk score
         risk_level, risk_score = self.compute_risk_score(

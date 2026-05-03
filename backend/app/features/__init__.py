@@ -1,1 +1,1 @@
-# Feature engineering module
+"""PlacementRisk AI package module."""

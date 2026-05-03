@@ -1,1 +1,1 @@
-# Monitoring module
+"""PlacementRisk AI package module."""

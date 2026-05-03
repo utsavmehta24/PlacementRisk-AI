@@ -38,8 +38,10 @@ apiClient.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  login: (email, password) => 
-    apiClient.post('/auth/login', { email, password }),
+  login: (identifier, password) => 
+    apiClient.post('/auth/login', { identifier, password }),
+  registerStudent: (payload) =>
+    apiClient.post('/auth/register-student', payload),
 };
 
 // Risk API
@@ -66,6 +68,40 @@ export const studentAPI = {
     apiClient.get(`/api/student/${studentId}/history`, { params: { limit } }),
   initiateAction: (studentId, actionType) => 
     apiClient.post(`/api/student/${studentId}/action`, { action_type: actionType }),
+};
+
+export const adminAPI = {
+  getUsers: (params) => apiClient.get('/api/admin/users', { params }),
+  getOfficers: () => apiClient.get('/api/admin/officers'),
+  getInstitutes: (params) => apiClient.get('/api/admin/institutes', { params }),
+  getInstituteStudents: (instituteId, params) => apiClient.get(`/api/admin/institutes/${instituteId}/students`, { params }),
+  getMonitoring: () => apiClient.get('/api/admin/monitoring'),
+  backfillScores: () => apiClient.post('/api/admin/backfill-risk-scores'),
+  generateAlerts: () => apiClient.post('/api/admin/generate-alerts'),
+};
+
+export const officerAPI = {
+  getDashboard: () => apiClient.get('/api/officer/dashboard'),
+  searchStudents: (params) => apiClient.get('/api/officer/students', { params }),
+};
+
+export const caseAPI = {
+  list: (params) => apiClient.get('/api/cases/', { params }),
+  detail: (caseId) => apiClient.get(`/api/cases/${caseId}`),
+  decide: (caseId, decision, reason) => apiClient.post(`/api/cases/${caseId}/decision`, { decision, reason }),
+  updateStatus: (caseId, status, note) => apiClient.post(`/api/cases/${caseId}/status`, { status, note }),
+};
+
+export const messageAPI = {
+  list: (caseId) => apiClient.get(`/api/messages/case/${caseId}`),
+  send: (caseId, body, receiver_user_id = null) => apiClient.post(`/api/messages/case/${caseId}`, { body, receiver_user_id }),
+};
+
+export const studentPortalAPI = {
+  me: () => apiClient.get('/api/student-portal/me'),
+  listInstitutes: (params) => apiClient.get('/api/student-portal/institutes', { params }),
+  updateProfile: (payload) => apiClient.put('/api/student-portal/profile', payload),
+  analyze: () => apiClient.post('/api/student-portal/analyze'),
 };
 
 export default apiClient;

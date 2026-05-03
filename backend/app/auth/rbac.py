@@ -23,3 +23,5 @@ class RoleChecker:
 require_admin = RoleChecker(["admin"])
 require_risk_head = RoleChecker(["admin", "risk_head"])
 require_loan_officer = RoleChecker(["admin", "risk_head", "loan_officer"])
+require_student = RoleChecker(["student"])
+require_officer = RoleChecker(["risk_head", "loan_officer"])

@@ -1,7 +1,7 @@
 """Portfolio analytics router"""
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, case
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
@@ -56,75 +56,65 @@ async def get_portfolio_heatmap(
     """
     Get portfolio heatmap showing risk distribution by institute and course
     """
-    # Build query
+    latest_score_subquery = db.query(
+        RiskScore.student_id.label("student_id"),
+        func.max(RiskScore.scored_at).label("max_scored_at")
+    ).group_by(RiskScore.student_id).subquery()
+
     query = db.query(
-        Institute.institute_name,
-        Student.course_type,
-        func.count(Student.id).label("student_count")
-    ).join(Student, Student.institute_id == Institute.id)
-    
-    # Apply filters
+        Institute.institute_name.label("institute_name"),
+        Student.course_type.label("course_type"),
+        func.count(RiskScore.id).label("student_count"),
+        func.sum(case((RiskScore.risk_level == "HIGH", 1), else_=0)).label("high_risk_count"),
+        func.sum(case((RiskScore.risk_level == "MEDIUM", 1), else_=0)).label("medium_risk_count"),
+        func.sum(case((RiskScore.risk_level == "LOW", 1), else_=0)).label("low_risk_count"),
+        func.avg(RiskScore.risk_score).label("avg_risk_score"),
+    ).join(
+        Student, Student.institute_id == Institute.id
+    ).join(
+        latest_score_subquery, latest_score_subquery.c.student_id == Student.id
+    ).join(
+        RiskScore,
+        and_(
+            RiskScore.student_id == latest_score_subquery.c.student_id,
+            RiskScore.scored_at == latest_score_subquery.c.max_scored_at
+        )
+    )
+
     if lender_id:
         query = query.filter(Student.lender_id == lender_id)
     if state:
         query = query.filter(Institute.state == state)
     if course_type:
         query = query.filter(Student.course_type == course_type)
-    
-    # Group by institute and course
-    query = query.group_by(Institute.institute_name, Student.course_type)
-    
-    results = query.all()
-    
-    # Get latest risk scores for each student
+
+    results = query.group_by(Institute.institute_name, Student.course_type).all()
+
     cells = []
     total_students = 0
     total_high_risk = 0
-    
-    for institute_name, course, student_count in results:
-        # Get latest risk scores for this group
-        risk_scores = db.query(RiskScore).join(
-            Student, Student.id == RiskScore.student_id
-        ).join(
-            Institute, Institute.id == Student.institute_id
-        ).filter(
-            and_(
-                Institute.institute_name == institute_name,
-                Student.course_type == course
-            )
-        ).order_by(RiskScore.scored_at.desc()).limit(student_count).all()
-        
-        if not risk_scores:
-            continue
-        
-        # Count risk levels
-        high_count = sum(1 for rs in risk_scores if rs.risk_level == "HIGH")
-        medium_count = sum(1 for rs in risk_scores if rs.risk_level == "MEDIUM")
-        low_count = sum(1 for rs in risk_scores if rs.risk_level == "LOW")
-        
-        avg_score = sum(rs.risk_score for rs in risk_scores) / len(risk_scores)
-        
-        # Determine color
+    for row in results:
+        avg_score = float(row.avg_risk_score or 0.0)
         if avg_score < 0.40:
-            risk_color = "#E24B4A"  # RED
+            risk_color = "#E24B4A"
         elif avg_score < 0.65:
-            risk_color = "#EF9F27"  # AMBER
+            risk_color = "#EF9F27"
         else:
-            risk_color = "#1D9E75"  # GREEN
-        
-        cells.append(HeatmapCell(
-            institute_name=institute_name,
-            course_type=course.value,
-            student_count=student_count,
-            high_risk_count=high_count,
-            medium_risk_count=medium_count,
-            low_risk_count=low_count,
+            risk_color = "#1D9E75"
+
+        cell = HeatmapCell(
+            institute_name=row.institute_name,
+            course_type=row.course_type.value if hasattr(row.course_type, "value") else str(row.course_type),
+            student_count=int(row.student_count or 0),
+            high_risk_count=int(row.high_risk_count or 0),
+            medium_risk_count=int(row.medium_risk_count or 0),
+            low_risk_count=int(row.low_risk_count or 0),
             avg_risk_score=round(avg_score, 4),
             risk_color=risk_color
-        ))
-        
-        total_students += student_count
-        total_high_risk += high_count
+        )
+        cells.append(cell)
+        total_students += cell.student_count
+        total_high_risk += cell.high_risk_count
     
     high_risk_pct = (total_high_risk / total_students * 100) if total_students > 0 else 0
     
@@ -198,17 +188,27 @@ async def get_portfolio_stats(
         query = query.filter(Student.lender_id == lender_id)
     total_students = query.scalar()
     
-    # Get latest risk scores
-    latest_scores = db.query(RiskScore).order_by(
-        RiskScore.student_id, RiskScore.scored_at.desc()
-    ).distinct(RiskScore.student_id).all()
-    
-    if latest_scores:
-        high_risk = sum(1 for rs in latest_scores if rs.risk_level == "HIGH")
-        avg_placement_prob = sum(rs.placement_prob_6mo for rs in latest_scores) / len(latest_scores)
-    else:
-        high_risk = 0
-        avg_placement_prob = 0
+    # Get latest risk score for each student in a DB-portable way
+    latest_score_subquery = db.query(
+        RiskScore.student_id.label("student_id"),
+        func.max(RiskScore.scored_at).label("max_scored_at")
+    ).group_by(RiskScore.student_id).subquery()
+
+    risk_agg = db.query(
+        func.count(RiskScore.id).label("total_scored"),
+        func.sum(case((RiskScore.risk_level == "HIGH", 1), else_=0)).label("high_risk"),
+        func.avg(RiskScore.placement_prob_6mo).label("avg_placement_prob")
+    ).join(
+        latest_score_subquery,
+        and_(
+            RiskScore.student_id == latest_score_subquery.c.student_id,
+            RiskScore.scored_at == latest_score_subquery.c.max_scored_at
+        )
+    ).first()
+
+    total_scored = int((risk_agg.total_scored or 0) if risk_agg else 0)
+    high_risk = int((risk_agg.high_risk or 0) if risk_agg else 0)
+    avg_placement_prob = float((risk_agg.avg_placement_prob or 0) if risk_agg else 0)
     
     # Alerts today
     today = datetime.now(timezone.utc).date()
@@ -220,7 +220,7 @@ async def get_portfolio_stats(
     return {
         "total_students": total_students,
         "high_risk_count": high_risk,
-        "high_risk_percentage": round(high_risk / total_students * 100, 2) if total_students > 0 else 0,
+        "high_risk_percentage": round(high_risk / total_scored * 100, 2) if total_scored > 0 else 0,
         "avg_placement_prob_6mo": round(avg_placement_prob, 4),
         "alerts_today": alerts_today
     }

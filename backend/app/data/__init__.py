@@ -1,1 +1,1 @@
-# Data module
+"""PlacementRisk AI package module."""

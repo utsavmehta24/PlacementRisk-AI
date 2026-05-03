@@ -11,6 +11,7 @@ from app.auth.rbac import require_loan_officer
 from app.models.schemas import User, Student, Institute, JobMarketSignal, RiskScore
 from app.ml.predict import get_predictor
 from app.ml.shap_explainer import generate_shap_explanation, get_next_best_action, get_action_resources
+from app.workflows.case_management import ensure_case_for_alert
 
 router = APIRouter()
 
@@ -119,14 +120,24 @@ async def score_student(
     predictor = get_predictor()
     prediction = predictor.predict(student_data, institute_data, job_market_data)
     
-    # Generate SHAP explanation
-    X, features = predictor.prepare_features(student_data, institute_data, job_market_data)
-    shap_explanation = generate_shap_explanation(
-        predictor.placement_models["6mo"],
-        X,
-        predictor.feature_names,
-        features
-    )
+    # Generate explanation (SHAP when models exist, rule-based fallback otherwise)
+    if predictor.fallback_only:
+        from app.ml.shap_explainer import generate_simple_explanation
+        features = {
+            "cgpa": student.cgpa,
+            "internship_count": student.internship_count,
+            "job_demand_index": job_market_data.get("job_demand_index", 0.5),
+            "institute_placement_rate_6mo": institute.placement_rate_6mo,
+        }
+        shap_explanation = generate_simple_explanation(features)
+    else:
+        X, features = predictor.prepare_features(student_data, institute_data, job_market_data)
+        shap_explanation = generate_shap_explanation(
+            predictor.placement_models["6mo"],
+            X,
+            predictor.feature_names,
+            features
+        )
     
     # Add risk level to explanation
     full_explanation = f"{shap_explanation} => Risk: {prediction['risk_level']}"
@@ -158,6 +169,19 @@ async def score_student(
         model_version=prediction["model_version"]
     )
     db.add(risk_score)
+    db.flush()
+
+    # Event-driven case trigger for risky cohorts
+    if prediction["risk_level"] in ["HIGH", "MEDIUM"] and prediction["placement_prob_6mo"] < 0.55:
+        ensure_case_for_alert(
+            db=db,
+            student_id=student.id,
+            alert_id=None,
+            risk_level=prediction["risk_level"],
+            recommended_action=next_action,
+            summary=f"AI trigger: {prediction['risk_level']} risk with {prediction['placement_prob_6mo']*100:.1f}% 6m placement probability.",
+        )
+
     db.commit()
     
     return {

@@ -12,7 +12,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U placementrisk"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-placementrisk} -d ${POSTGRES_DB:-placementrisk}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -75,6 +75,8 @@ services:
       - postgres
       - redis
     command: celery -A app.celery_app worker --loglevel=info --beat
+    profiles:
+      - mlops
 
   mlflow:
     image: python:3.10-slim
@@ -92,6 +94,8 @@ services:
                mlflow server --host 0.0.0.0 --port 5000 
                --backend-store-uri sqlite:///mlflow.db 
                --default-artifact-root /mlflow/artifacts"
+    profiles:
+      - mlops
 
   airflow:
     image: apache/airflow:2.7.3-python3.10
@@ -115,9 +119,12 @@ services:
       postgres:
         condition: service_healthy
     command: >
-      bash -c "airflow db migrate &&
+      bash -c "airflow db init &&
+               airflow db migrate &&
                airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@placementrisk.ai || true &&
                airflow webserver & airflow scheduler"
+    profiles:
+      - mlops
 
   frontend:
     build:

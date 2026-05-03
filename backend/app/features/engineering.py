@@ -143,7 +143,15 @@ def engineer_features(student_data: Dict[str, Any], institute_data: Dict[str, An
     )
     
     # Additional derived features
-    days_since_disbursal = (datetime.now() - student_data.get("disbursal_date", datetime.now())).days
+    disbursal_date = student_data.get("disbursal_date", datetime.now())
+    if isinstance(disbursal_date, str):
+        try:
+            disbursal_date = datetime.fromisoformat(disbursal_date.replace("Z", "+00:00"))
+        except ValueError:
+            disbursal_date = datetime.now()
+    if pd.isna(disbursal_date):
+        disbursal_date = datetime.now()
+    days_since_disbursal = (datetime.now() - disbursal_date).days
     months_since_disbursal = days_since_disbursal / 30
     
     # Internship quality score

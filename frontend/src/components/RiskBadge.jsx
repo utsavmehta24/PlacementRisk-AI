@@ -25,7 +25,7 @@ function RiskBadge({ level, score, large = false }) {
       </span>
       {score !== undefined && (
         <span className="text-sm text-gray-600">
-          Score: {(score * 100).toFixed(1)}
+          Score: {(score * 100).toFixed(1)}%
         </span>
       )}
     </div>

@@ -51,6 +51,16 @@ class RiskLevel(str, enum.Enum):
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
 
+class CaseStatus(str, enum.Enum):
+    NEW = "NEW"
+    UNDER_REVIEW = "UNDER_REVIEW"
+    ACTION_PROPOSED = "ACTION_PROPOSED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    IN_PROGRESS = "IN_PROGRESS"
+    RESOLVED = "RESOLVED"
+    CLOSED = "CLOSED"
+
 
 class User(Base):
     """User model for authentication"""
@@ -63,6 +73,31 @@ class User(Base):
     role = Column(String, nullable=False)  # loan_officer, risk_head, admin
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    lender_officer_profile = relationship("LenderOfficerProfile", back_populates="user", uselist=False)
+
+
+class LenderOrganization(Base):
+    __tablename__ = "lender_organizations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False, unique=True)
+    code = Column(String, nullable=False, unique=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class LenderOfficerProfile(Base):
+    __tablename__ = "lender_officer_profiles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
+    lender_org_id = Column(UUID(as_uuid=True), ForeignKey("lender_organizations.id"), nullable=True)
+    employee_code = Column(String, nullable=True)
+    designation = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User", back_populates="lender_officer_profile")
 
 
 class Institute(Base):
@@ -115,6 +150,8 @@ class Student(Base):
     placement_outcome = relationship("PlacementOutcome", back_populates="student", uselist=False)
     risk_scores = relationship("RiskScore", back_populates="student")
     alerts = relationship("EarlyWarningAlert", back_populates="student")
+    user_link = relationship("StudentUserLink", back_populates="student", uselist=False)
+    cases = relationship("StudentCase", back_populates="student")
 
 
 class PlacementOutcome(Base):
@@ -207,3 +244,76 @@ class StudentAction(Base):
     initiated_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime)
+
+
+class StudentUserLink(Base):
+    __tablename__ = "student_user_links"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, unique=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    student = relationship("Student", back_populates="user_link")
+
+
+class StudentCase(Base):
+    __tablename__ = "student_cases"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True)
+    current_status = Column(Enum(CaseStatus), nullable=False, default=CaseStatus.NEW)
+    risk_level_snapshot = Column(String, nullable=True)
+    recommended_action = Column(String, nullable=True)
+    assigned_officer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    latest_alert_id = Column(UUID(as_uuid=True), ForeignKey("early_warning_alerts.id"), nullable=True)
+    sla_due_at = Column(DateTime, nullable=True)
+    summary = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    student = relationship("Student", back_populates="cases")
+    events = relationship("CaseEvent", back_populates="case")
+    messages = relationship("StudentMessage", back_populates="case")
+    approvals = relationship("ApprovalDecision", back_populates="case")
+
+
+class CaseEvent(Base):
+    __tablename__ = "case_events"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    case_id = Column(UUID(as_uuid=True), ForeignKey("student_cases.id"), nullable=False, index=True)
+    actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    event_type = Column(String, nullable=False)
+    event_note = Column(Text, nullable=True)
+    from_status = Column(String, nullable=True)
+    to_status = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+    case = relationship("StudentCase", back_populates="events")
+
+
+class StudentMessage(Base):
+    __tablename__ = "student_messages"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    case_id = Column(UUID(as_uuid=True), ForeignKey("student_cases.id"), nullable=False, index=True)
+    sender_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    receiver_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    body = Column(Text, nullable=False)
+    sent_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+    case = relationship("StudentCase", back_populates="messages")
+
+
+class ApprovalDecision(Base):
+    __tablename__ = "approval_decisions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    case_id = Column(UUID(as_uuid=True), ForeignKey("student_cases.id"), nullable=False, index=True)
+    decided_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    decision = Column(String, nullable=False)  # approved/rejected
+    reason = Column(Text, nullable=False)
+    decided_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+    case = relationship("StudentCase", back_populates="approvals")

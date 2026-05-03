@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import risk, portfolio, student, auth
+from app.routers import risk, portfolio, student, auth, admin, officer, student_portal, cases, messages
 
 settings = get_settings()
 
@@ -46,6 +46,11 @@ app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(risk.router, prefix="/api/risk", tags=["Risk Scoring"])
 app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio Analytics"])
 app.include_router(student.router, prefix="/api/student", tags=["Student Management"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(officer.router, prefix="/api/officer", tags=["Officer"])
+app.include_router(student_portal.router, prefix="/api/student-portal", tags=["Student Portal"])
+app.include_router(cases.router, prefix="/api/cases", tags=["Cases"])
+app.include_router(messages.router, prefix="/api/messages", tags=["Messaging"])
 
 
 @app.get("/")
